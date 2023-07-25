@@ -1,7 +1,11 @@
 package com.coriander.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.coriander.dto.LoginFormDTO;
+import com.coriander.dto.Result;
 import com.coriander.entity.User;
+
+import javax.servlet.http.HttpSession;
 
 /**
  * <p>
@@ -13,4 +17,7 @@ import com.coriander.entity.User;
  */
 public interface IUserService extends IService<User> {
 
+    Result sendCoode(String phone, HttpSession session);
+
+    Result login(LoginFormDTO loginForm, HttpSession session);
 }
