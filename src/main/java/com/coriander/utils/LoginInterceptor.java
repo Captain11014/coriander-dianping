@@ -30,6 +30,7 @@ public class LoginInterceptor implements HandlerInterceptor {
 
         if(UserHolder.getUser() == null){
            response.setStatus(401);
+           response.getWriter().print("no login");
            return false;
         }
 
