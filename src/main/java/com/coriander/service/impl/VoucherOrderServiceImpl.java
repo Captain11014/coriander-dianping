@@ -1,15 +1,19 @@
 package com.coriander.service.impl;
 
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.coriander.dto.Result;
 import com.coriander.entity.SeckillVoucher;
 import com.coriander.entity.VoucherOrder;
 import com.coriander.mapper.VoucherOrderMapper;
 import com.coriander.service.ISeckillVoucherService;
 import com.coriander.service.IVoucherOrderService;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.coriander.utils.RedisIdWorker;
+import com.coriander.utils.SimpleRedisLock;
 import com.coriander.utils.UserHolder;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +37,12 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Resource
     private RedisIdWorker redisIdWorker;
 
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
+    @Resource
+    private RedissonClient redissonClient;
+
     @Override
     public Result seckillVoucher(Long voucherId) {
         //1.查询优惠券
@@ -54,16 +64,35 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
         Long userId = UserHolder.getUser().getId();
 
-        synchronized (userId.toString().intern()){
+        //创建所对象
+//        SimpleRedisLock lock = new SimpleRedisLock("order:" + userId, stringRedisTemplate);
+        RLock lock = redissonClient.getLock("lock:order:" + userId);
+        //获取锁
+        boolean isLock = lock.tryLock();
+        //判断是否获取锁成功
+        if(!isLock){
+            //失败
+            return Result.fail("不允许重复下单");
+        }
+//  单体服务下使用      synchronized (userId.toString().intern()){
+        try {
             /**
              * 注意，为了防止事物失效，需要获取其代理对象。
              */
             //获取代理对象（事物）
             IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
             return proxy.createVoucherOrder(voucherId);
+        } finally {
+            lock.unlock();
         }
+//        }
     }
 
+    /**
+     * 创建订单
+     * @param voucherId
+     * @return
+     */
     @Transactional
     public Result createVoucherOrder(Long voucherId) {
         //用户id
