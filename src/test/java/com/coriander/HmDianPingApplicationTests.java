@@ -11,14 +11,22 @@ import com.coriander.utils.RedisIdWorker;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.geo.Point;
+import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
+
+import static com.coriander.utils.RedisConstants.SHOP_GEO_KEY;
 
 @SpringBootTest
 class HmDianPingApplicationTests {
@@ -80,6 +88,36 @@ class HmDianPingApplicationTests {
 
         shopServiceImpl.saveShop2Redis(1L, 10L);
 
+    }
+
+
+    @Test
+    void loadShopData(){
+        //查询店铺信息
+        List<Shop> list = shopService.list();
+        //店铺分组，按照typeid分组
+        Map<Long,List<Shop>> map = list.stream().collect(Collectors.groupingBy(Shop::getTypeId));
+        //分批完成写入redis
+        for(Map.Entry<Long, List<Shop>> entry : map.entrySet()){
+            //获取类型id
+            Long typeId = entry.getKey();
+            String key = SHOP_GEO_KEY + typeId;
+            //获取同类型的店铺合集
+            List<Shop> value = entry.getValue();
+
+            List<RedisGeoCommands.GeoLocation<String>> locations = new ArrayList<>();
+
+            //写入redis, GEOADD key经度 纬度member
+            for(Shop shop : value){
+//                stringRedisTemplate.opsForGeo().add(key,new Point(shop.getX(), shop.getY()),shop.getId().toString());
+                locations.add(new RedisGeoCommands.GeoLocation<>(
+                        shop.getId().toString(),
+                        new Point(shop.getX(), shop.getY())
+                ));
+            }
+            stringRedisTemplate.opsForGeo().add(key, locations);
+
+        }
     }
 
 
