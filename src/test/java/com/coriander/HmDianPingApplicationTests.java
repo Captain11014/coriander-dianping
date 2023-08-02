@@ -68,7 +68,7 @@ class HmDianPingApplicationTests {
         latch.await();
         long end = System.currentTimeMillis();
 
-        System.out.println("time = "+(end - begin));
+        System.out.println("time = " + (end - begin));
     }
 
 
@@ -92,13 +92,13 @@ class HmDianPingApplicationTests {
 
 
     @Test
-    void loadShopData(){
+    void loadShopData() {
         //查询店铺信息
         List<Shop> list = shopService.list();
         //店铺分组，按照typeid分组
-        Map<Long,List<Shop>> map = list.stream().collect(Collectors.groupingBy(Shop::getTypeId));
+        Map<Long, List<Shop>> map = list.stream().collect(Collectors.groupingBy(Shop::getTypeId));
         //分批完成写入redis
-        for(Map.Entry<Long, List<Shop>> entry : map.entrySet()){
+        for (Map.Entry<Long, List<Shop>> entry : map.entrySet()) {
             //获取类型id
             Long typeId = entry.getKey();
             String key = SHOP_GEO_KEY + typeId;
@@ -108,7 +108,7 @@ class HmDianPingApplicationTests {
             List<RedisGeoCommands.GeoLocation<String>> locations = new ArrayList<>();
 
             //写入redis, GEOADD key经度 纬度member
-            for(Shop shop : value){
+            for (Shop shop : value) {
 //                stringRedisTemplate.opsForGeo().add(key,new Point(shop.getX(), shop.getY()),shop.getId().toString());
                 locations.add(new RedisGeoCommands.GeoLocation<>(
                         shop.getId().toString(),
@@ -120,5 +120,24 @@ class HmDianPingApplicationTests {
         }
     }
 
+
+    @Test
+    void testHyperLogLog() {
+        //准备数组，装用户数据
+        String[] users = new String[1000];//数组角标
+        int index = 0;
+        for (int i = 1; i <= 1000000; i++) {
+            //赋值
+            users[index++] = "user_" + i;//每1000条发送一次
+            if (i % 1000 == 0) {
+                index = 0;
+                stringRedisTemplate.opsForHyperLogLog().add("hll1",users);
+            }
+        }
+        //统计数量
+        Long size = stringRedisTemplate.opsForHyperLogLog().size("hll1");
+        System.out.println("size = " + size);
+
+    }
 
 }
